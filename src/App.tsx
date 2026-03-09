@@ -134,18 +134,22 @@ export default function App() {
   const [memoContent, setMemoContent] = useState('');
   const [mergeTitle, setMergeTitle] = useState('');
 
-  // Load from LocalStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('monochrome-memos');
-    if (saved) {
-      setMemos(JSON.parse(saved));
+  // Fetch from D1
+  const fetchMemos = async () => {
+    try {
+      const response = await fetch('/api/memos');
+      if (response.ok) {
+        const data = await response.json();
+        setMemos(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch memos:', error);
     }
-  }, []);
+  };
 
-  // Save to LocalStorage
   useEffect(() => {
-    localStorage.setItem('monochrome-memos', JSON.stringify(memos));
-  }, [memos]);
+    fetchMemos();
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -158,15 +162,26 @@ export default function App() {
     })
   );
 
-  const handleDragEnd = (event: any) => {
+  const handleDragEnd = async (event: any) => {
     const { active, over } = event;
 
     if (active.id !== over.id) {
-      setMemos((items) => {
-        const oldIndex = items.findIndex((i) => i.id === active.id);
-        const newIndex = items.findIndex((i) => i.id === over.id);
-        return arrayMove(items, oldIndex, newIndex);
-      });
+      const oldIndex = memos.findIndex((i) => i.id === active.id);
+      const newIndex = memos.findIndex((i) => i.id === over.id);
+      const newMemos = arrayMove(memos, oldIndex, newIndex);
+      
+      setMemos(newMemos);
+
+      // Sync reorder to D1
+      try {
+        await fetch('/api/memos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newMemos),
+        });
+      } catch (error) {
+        console.error('Failed to sync order:', error);
+      }
     }
   };
 
@@ -184,33 +199,52 @@ export default function App() {
     setIsModalOpen(true);
   };
 
-  const handleSaveMemo = () => {
+  const handleSaveMemo = async () => {
     if (!memoTitle.trim()) {
       alert('タイトルを入力してください。');
       return;
     }
 
-    if (editingMemo) {
-      // Update existing
-      setMemos(memos.map(m => m.id === editingMemo.id 
-        ? { ...m, title: memoTitle, content: memoContent } 
-        : m
-      ));
-    } else {
-      // Create new
-      const newMemo: Memo = {
-        id: crypto.randomUUID(),
-        title: memoTitle,
-        content: memoContent,
-        createdAt: Date.now(),
-      };
-      setMemos([newMemo, ...memos]);
+    try {
+      if (editingMemo) {
+        // Update existing in D1
+        const response = await fetch('/api/memos', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingMemo.id, title: memoTitle, content: memoContent }),
+        });
+        if (response.ok) {
+          setMemos(memos.map(m => m.id === editingMemo.id 
+            ? { ...m, title: memoTitle, content: memoContent } 
+            : m
+          ));
+        }
+      } else {
+        // Create new in D1
+        const newMemoData = {
+          id: crypto.randomUUID(),
+          title: memoTitle,
+          content: memoContent,
+          createdAt: Date.now(),
+        };
+        const response = await fetch('/api/memos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newMemoData),
+        });
+        if (response.ok) {
+          // Re-fetch to get correct displayOrder from server
+          await fetchMemos();
+        }
+      }
+      setIsModalOpen(false);
+      setMemoTitle('');
+      setMemoContent('');
+      setEditingMemo(null);
+    } catch (error) {
+      console.error('Failed to save memo:', error);
+      alert('保存に失敗しました。');
     }
-
-    setIsModalOpen(false);
-    setMemoTitle('');
-    setMemoContent('');
-    setEditingMemo(null);
   };
 
   const toggleSelect = (id: string) => {
@@ -221,14 +255,26 @@ export default function App() {
     );
   };
 
-  const handleDeleteSelected = () => {
+  const handleDeleteSelected = async () => {
     if (confirm(`${selectedIds.length} 個のメモを削除しますか？`)) {
-      setMemos(memos.filter(m => !selectedIds.includes(m.id)));
-      setSelectedIds([]);
+      try {
+        const response = await fetch('/api/memos', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: selectedIds }),
+        });
+        if (response.ok) {
+          setMemos(memos.filter(m => !selectedIds.includes(m.id)));
+          setSelectedIds([]);
+        }
+      } catch (error) {
+        console.error('Failed to delete memos:', error);
+        alert('削除に失敗しました。');
+      }
     }
   };
 
-  const handleMerge = () => {
+  const handleMerge = async () => {
     if (!mergeTitle.trim()) {
       alert('タイトルを入力してください。');
       return;
@@ -237,17 +283,29 @@ export default function App() {
     const selectedMemos = memos.filter(m => selectedIds.includes(m.id));
     const mergedContent = selectedMemos.map(m => `--- ${m.title} ---\n${m.content}`).join('\n\n');
     
-    const newMemo: Memo = {
+    const newMemoData = {
       id: crypto.randomUUID(),
       title: mergeTitle,
       content: mergedContent,
       createdAt: Date.now(),
     };
-    
-    setMemos([newMemo, ...memos]);
-    setSelectedIds([]);
-    setMergeTitle('');
-    setIsMergeModalOpen(false);
+
+    try {
+      const response = await fetch('/api/memos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newMemoData),
+      });
+      if (response.ok) {
+        await fetchMemos();
+        setSelectedIds([]);
+        setMergeTitle('');
+        setIsMergeModalOpen(false);
+      }
+    } catch (error) {
+      console.error('Failed to merge memos:', error);
+      alert('合体に失敗しました。');
+    }
   };
 
   return (

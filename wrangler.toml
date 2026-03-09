@@ -1,3 +1,8 @@
 name = "mixmemo"
 compatibility_date = "2024-03-09"
 pages_build_output_dir = "dist"
+
+[[ d1_databases ]]
+binding = "DB"
+database_name = "mixmemo-db"
+database_id = "83679efb-c045-4d54-99aa-f5d2b33d7809"
