@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { 
   Plus, 
   Merge, 
   Trash2, 
   GripVertical, 
-  X,
   Calendar
 } from 'lucide-react';
 import { 
@@ -12,6 +12,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -24,6 +25,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion, AnimatePresence } from 'framer-motion';
+import EditMemo from './pages/EditMemo';
 
 // --- Types ---
 
@@ -81,7 +83,6 @@ function SortableMemoCard({
       style={style} 
       className={`memo-card ${isSelected ? 'selected' : ''}`}
       onClick={(e) => {
-        // Prevent click if clicking checkbox or drag handle
         if ((e.target as HTMLElement).closest('.checkbox-container') || (e.target as HTMLElement).closest('.drag-handle')) {
           return;
         }
@@ -103,7 +104,7 @@ function SortableMemoCard({
         className="drag-handle" 
         {...attributes} 
         {...listeners}
-        style={{ cursor: 'grab', display: 'inline-block', marginBottom: '8px' }}
+        style={{ cursor: 'grab', display: 'inline-block', marginBottom: '8px', touchAction: 'none' }}
         onClick={(e) => e.stopPropagation()}
       >
         <GripVertical size={16} color="#666" />
@@ -118,43 +119,27 @@ function SortableMemoCard({
   );
 }
 
-// --- Main App Component ---
+// --- Memo List View ---
 
-export default function App() {
-  const [memos, setMemos] = useState<Memo[]>([]);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+function MemoList({ 
+  memos, 
+  setMemos, 
+  selectedIds, 
+  setSelectedIds, 
+  setIsMergeModalOpen 
+}: any) {
+  const navigate = useNavigate();
   
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
-  const [editingMemo, setEditingMemo] = useState<Memo | null>(null);
-  
-  // Form State
-  const [memoTitle, setMemoTitle] = useState('');
-  const [memoContent, setMemoContent] = useState('');
-  const [mergeTitle, setMergeTitle] = useState('');
-
-  // Fetch from D1
-  const fetchMemos = async () => {
-    try {
-      const response = await fetch('/api/memos');
-      if (response.ok) {
-        const data = await response.json();
-        setMemos(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch memos:', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchMemos();
-  }, []);
-
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -166,13 +151,12 @@ export default function App() {
     const { active, over } = event;
 
     if (active.id !== over.id) {
-      const oldIndex = memos.findIndex((i) => i.id === active.id);
-      const newIndex = memos.findIndex((i) => i.id === over.id);
+      const oldIndex = memos.findIndex((i: Memo) => i.id === active.id);
+      const newIndex = memos.findIndex((i: Memo) => i.id === over.id);
       const newMemos = arrayMove(memos, oldIndex, newIndex);
       
       setMemos(newMemos);
 
-      // Sync reorder to D1
       try {
         await fetch('/api/memos', {
           method: 'POST',
@@ -185,70 +169,8 @@ export default function App() {
     }
   };
 
-  const openCreateModal = () => {
-    setEditingMemo(null);
-    setMemoTitle('');
-    setMemoContent('');
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (memo: Memo) => {
-    setEditingMemo(memo);
-    setMemoTitle(memo.title);
-    setMemoContent(memo.content);
-    setIsModalOpen(true);
-  };
-
-  const handleSaveMemo = async () => {
-    if (!memoTitle.trim()) {
-      alert('タイトルを入力してください。');
-      return;
-    }
-
-    try {
-      if (editingMemo) {
-        // Update existing in D1
-        const response = await fetch('/api/memos', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: editingMemo.id, title: memoTitle, content: memoContent }),
-        });
-        if (response.ok) {
-          setMemos(memos.map(m => m.id === editingMemo.id 
-            ? { ...m, title: memoTitle, content: memoContent } 
-            : m
-          ));
-        }
-      } else {
-        // Create new in D1
-        const newMemoData = {
-          id: crypto.randomUUID(),
-          title: memoTitle,
-          content: memoContent,
-          createdAt: Date.now(),
-        };
-        const response = await fetch('/api/memos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newMemoData),
-        });
-        if (response.ok) {
-          // Re-fetch to get correct displayOrder from server
-          await fetchMemos();
-        }
-      }
-      setIsModalOpen(false);
-      setMemoTitle('');
-      setMemoContent('');
-      setEditingMemo(null);
-    } catch (error) {
-      console.error('Failed to save memo:', error);
-      alert('保存に失敗しました。');
-    }
-  };
-
   const toggleSelect = (id: string) => {
-    setSelectedIds(prev => 
+    setSelectedIds((prev: string[]) => 
       prev.includes(id) 
         ? prev.filter(i => i !== id) 
         : [...prev, id]
@@ -264,47 +186,12 @@ export default function App() {
           body: JSON.stringify({ ids: selectedIds }),
         });
         if (response.ok) {
-          setMemos(memos.filter(m => !selectedIds.includes(m.id)));
+          setMemos(memos.filter((m: any) => !selectedIds.includes(m.id)));
           setSelectedIds([]);
         }
       } catch (error) {
         console.error('Failed to delete memos:', error);
-        alert('削除に失敗しました。');
       }
-    }
-  };
-
-  const handleMerge = async () => {
-    if (!mergeTitle.trim()) {
-      alert('タイトルを入力してください。');
-      return;
-    }
-    
-    const selectedMemos = memos.filter(m => selectedIds.includes(m.id));
-    const mergedContent = selectedMemos.map(m => `--- ${m.title} ---\n${m.content}`).join('\n\n');
-    
-    const newMemoData = {
-      id: crypto.randomUUID(),
-      title: mergeTitle,
-      content: mergedContent,
-      createdAt: Date.now(),
-    };
-
-    try {
-      const response = await fetch('/api/memos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newMemoData),
-      });
-      if (response.ok) {
-        await fetchMemos();
-        setSelectedIds([]);
-        setMergeTitle('');
-        setIsMergeModalOpen(false);
-      }
-    } catch (error) {
-      console.error('Failed to merge memos:', error);
-      alert('合体に失敗しました。');
     }
   };
 
@@ -324,7 +211,7 @@ export default function App() {
       }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.02em' }}>MEMO</h1>
         <button 
-          onClick={openCreateModal}
+          onClick={() => navigate('/edit/new')}
           style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}
         >
           <Plus size={18} />
@@ -340,16 +227,16 @@ export default function App() {
         >
           <div className="memo-grid">
             <SortableContext 
-              items={memos.map(m => m.id)}
+              items={memos.map((m: any) => m.id)}
               strategy={rectSortingStrategy}
             >
-              {memos.map((memo) => (
+              {memos.map((memo: any) => (
                 <SortableMemoCard 
                   key={memo.id} 
                   memo={memo} 
                   isSelected={selectedIds.includes(memo.id)}
                   onToggleSelect={toggleSelect}
-                  onClick={openEditModal}
+                  onClick={(m) => navigate(`/edit/${m.id}`)}
                 />
               ))}
             </SortableContext>
@@ -370,7 +257,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Floating Action for Selection */}
       <AnimatePresence>
         {selectedIds.length >= 1 && (
           <motion.div 
@@ -447,64 +333,86 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
 
-      {/* Create/Edit Modal */}
-      <AnimatePresence>
-        {isModalOpen && (
-          <motion.div 
-            className="modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div 
-              className="modal-content"
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                <h2 style={{ margin: 0, fontSize: '1.1rem' }}>
-                  {editingMemo ? 'メモを編集' : '新規メモ'}
-                </h2>
-                <X 
-                  style={{ cursor: 'pointer', color: '#666' }} 
-                  onClick={() => setIsModalOpen(false)} 
-                />
-              </div>
-              
-              {editingMemo && (
-                <div style={{ marginBottom: '16px', fontSize: '0.75rem', color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Calendar size={12} />
-                  作成日: {formatDate(editingMemo.createdAt)}
-                </div>
-              )}
+// --- Main App Component ---
 
-              <input 
-                type="text" 
-                placeholder="タイトル（必須）" 
-                value={memoTitle}
-                onChange={(e) => setMemoTitle(e.target.value)}
-                autoFocus
-              />
-              <textarea 
-                placeholder="内容を入力..." 
-                rows={10}
-                value={memoContent}
-                onChange={(e) => setMemoContent(e.target.value)}
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                <button onClick={() => setIsModalOpen(false)} style={{ border: 'none' }}>キャンセル</button>
-                <button onClick={handleSaveMemo} style={{ background: '#fff', color: '#000', fontWeight: 600 }}>
-                  {editingMemo ? '更新' : '作成'}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+export default function App() {
+  const [memos, setMemos] = useState<Memo[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
+  const [mergeTitle, setMergeTitle] = useState('');
 
-      {/* Merge Modal */}
+  const fetchMemos = async () => {
+    try {
+      const response = await fetch('/api/memos');
+      if (response.ok) {
+        const data = await response.json();
+        setMemos(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch memos:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchMemos();
+  }, []);
+
+  const handleMerge = async () => {
+    if (!mergeTitle.trim()) {
+      alert('タイトルを入力してください。');
+      return;
+    }
+    
+    const selectedMemos = memos.filter(m => selectedIds.includes(m.id));
+    const mergedContent = selectedMemos.map(m => `--- ${m.title} ---\n${m.content}`).join('\n\n');
+    
+    const newMemoData = {
+      id: crypto.randomUUID(),
+      title: mergeTitle,
+      content: mergedContent,
+      createdAt: Date.now(),
+    };
+
+    try {
+      const response = await fetch('/api/memos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newMemoData),
+      });
+      if (response.ok) {
+        await fetchMemos();
+        setSelectedIds([]);
+        setMergeTitle('');
+        setIsMergeModalOpen(false);
+      }
+    } catch (error) {
+      console.error('Failed to merge memos:', error);
+    }
+  };
+
+  return (
+    <>
+      <Routes>
+        <Route 
+          path="/" 
+          element={
+            <MemoList 
+              memos={memos} 
+              setMemos={setMemos} 
+              selectedIds={selectedIds} 
+              setSelectedIds={setSelectedIds} 
+              setIsMergeModalOpen={setIsMergeModalOpen}
+            />
+          } 
+        />
+        <Route path="/edit/:id" element={<EditMemo />} />
+      </Routes>
+
+      {/* Merge Modal - kept as modal as it's a simple multi-select action */}
       <AnimatePresence>
         {isMergeModalOpen && (
           <motion.div 
@@ -538,7 +446,7 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }
 
