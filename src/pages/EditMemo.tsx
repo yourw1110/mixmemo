@@ -174,7 +174,7 @@ export default function EditMemo() {
         />
         
         <textarea 
-          placeholder="内容を入力..." 
+          placeholder="内容を入力" 
           value={content}
           onChange={(e) => setContent(e.target.value)}
           style={{ 
