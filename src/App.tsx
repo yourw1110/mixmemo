@@ -112,6 +112,7 @@ function SortableMemoCard({
 
       <div className="memo-card-date">
         {formatDate(memo.createdAt)}
+        <span className="memo-card-count">{memo.content.length} 文字</span>
       </div>
       <div className="memo-card-title">{memo.title}</div>
       <div className="memo-card-content">{memo.content}</div>
@@ -368,7 +369,7 @@ export default function App() {
     }
     
     const selectedMemos = memos.filter(m => selectedIds.includes(m.id));
-    const mergedContent = selectedMemos.map(m => `--- ${m.title} ---\n${m.content}`).join('\n\n');
+    const mergedContent = selectedMemos.map(m => `> ${m.title}\n${m.content}`).join('\n\n');
     
     const newMemoData = {
       id: crypto.randomUUID(),
