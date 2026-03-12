@@ -34,14 +34,14 @@ export async function onRequestPost(context) {
     }
 
     // Handle single create
-    const { id, title, content, createdAt } = data;
+    const { id, title, content, createdAt, updatedAt } = data;
     
     // Get max displayOrder
     const maxOrder = await env.DB.prepare("SELECT MAX(displayOrder) as maxOrder FROM memos").first("maxOrder") || 0;
 
     await env.DB.prepare(
-      "INSERT INTO memos (id, title, content, createdAt, displayOrder) VALUES (?, ?, ?, ?, ?)"
-    ).bind(id, title, content, createdAt, maxOrder + 1).run();
+      "INSERT INTO memos (id, title, content, createdAt, updatedAt, displayOrder) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(id, title, content, createdAt, updatedAt || createdAt, maxOrder + 1).run();
 
     return new Response(JSON.stringify({ id, success: true }), {
       status: 201,
@@ -58,10 +58,10 @@ export async function onRequestPost(context) {
 export async function onRequestPut(context) {
   const { env, request } = context;
   try {
-    const { id, title, content } = await request.json();
+    const { id, title, content, updatedAt } = await request.json();
     await env.DB.prepare(
-      "UPDATE memos SET title = ?, content = ? WHERE id = ?"
-    ).bind(title, content, id).run();
+      "UPDATE memos SET title = ?, content = ?, updatedAt = ? WHERE id = ?"
+    ).bind(title, content, updatedAt || Date.now(), id).run();
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
     });

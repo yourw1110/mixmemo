@@ -34,6 +34,7 @@ interface Memo {
   title: string;
   content: string;
   createdAt: number;
+  updatedAt: number;
 }
 
 // --- Utils ---
@@ -110,8 +111,9 @@ function SortableMemoCard({
         <GripVertical size={16} color="#666" />
       </div>
 
-      <div className="memo-card-date">
-        {formatDate(memo.createdAt)}
+      <div className="memo-card-date" style={{ fontSize: '0.65rem', gap: '4px', flexWrap: 'wrap' }}>
+        <span>作: {formatDate(memo.createdAt)}</span>
+        <span style={{ color: '#888' }}>更: {formatDate(memo.updatedAt || memo.createdAt)}</span>
         <span className="memo-card-count">{memo.content.length} 文字</span>
       </div>
       <div className="memo-card-title">{memo.title}</div>

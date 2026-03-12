@@ -8,6 +8,7 @@ interface Memo {
   title: string;
   content: string;
   createdAt: number;
+  updatedAt: number;
 }
 
 export default function EditMemo() {
@@ -18,6 +19,7 @@ export default function EditMemo() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [createdAt, setCreatedAt] = useState(Date.now());
+  const [updatedAt, setUpdatedAt] = useState(Date.now());
   const [isLoading, setIsLoading] = useState(isEditing);
 
   useEffect(() => {
@@ -30,6 +32,7 @@ export default function EditMemo() {
             setTitle(memo.title);
             setContent(memo.content);
             setCreatedAt(memo.createdAt);
+            setUpdatedAt(memo.updatedAt || memo.createdAt);
           }
           setIsLoading(false);
         })
@@ -56,11 +59,18 @@ export default function EditMemo() {
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(isEditing 
+          ? { id, title, content, updatedAt: Date.now() } 
+          : body),
       });
 
       if (response.ok) {
-        navigate('/');
+        if (isEditing) {
+          setUpdatedAt(Date.now());
+          // Optional: Show a brief success message or visual indicator
+        } else {
+          navigate('/');
+        }
       } else {
         alert('保存に失敗しました。');
       }
@@ -149,9 +159,15 @@ export default function EditMemo() {
 
       <main style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {isEditing && (
-          <div style={{ fontSize: '0.8rem', color: '#666', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Calendar size={14} />
-            作成日時: {formatDate(createdAt)}
+          <div style={{ fontSize: '0.8rem', color: '#666', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Calendar size={14} />
+              作成日時: {formatDate(createdAt)}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Calendar size={14} />
+              最終更新: {formatDate(updatedAt)}
+            </div>
           </div>
         )}
         
