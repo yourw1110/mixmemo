@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { X, Calendar, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
+import Toast from '../components/Toast';
 
 interface Memo {
   id: string;
@@ -21,9 +22,12 @@ export default function EditMemo() {
   const [createdAt, setCreatedAt] = useState(Date.now());
   const [updatedAt, setUpdatedAt] = useState(Date.now());
   const [isLoading, setIsLoading] = useState(isEditing);
+  const [isSaving, setIsSaving] = useState(false);
+  const [toast, setToast] = useState({ isVisible: false, message: '' });
 
   useEffect(() => {
     if (isEditing) {
+      setIsLoading(true);
       fetch(`/api/memos`)
         .then(res => res.json())
         .then((memos: Memo[]) => {
@@ -49,27 +53,35 @@ export default function EditMemo() {
       return;
     }
 
+    if (isSaving) return;
+    setIsSaving(true);
+
     try {
       const url = '/api/memos';
       const method = isEditing ? 'PUT' : 'POST';
+      const newId = isEditing ? id : crypto.randomUUID();
+      const now = Date.now();
+      
       const body = isEditing 
-        ? { id, title, content } 
-        : { id: crypto.randomUUID(), title, content, createdAt: Date.now() };
+        ? { id, title, content, updatedAt: now } 
+        : { id: newId, title, content, createdAt: now, updatedAt: now };
 
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(isEditing 
-          ? { id, title, content, updatedAt: Date.now() } 
-          : body),
+        body: JSON.stringify(body),
       });
 
       if (response.ok) {
         if (isEditing) {
-          setUpdatedAt(Date.now());
-          // Optional: Show a brief success message or visual indicator
+          setUpdatedAt(now);
+          setToast({ isVisible: true, message: '更新しました' });
         } else {
-          navigate('/');
+          setToast({ isVisible: true, message: '保存しました' });
+          // Navigate to the edit page for the new memo
+          setTimeout(() => {
+            navigate(`/edit/${newId}`, { replace: true });
+          }, 100);
         }
       } else {
         alert('保存に失敗しました。');
@@ -77,6 +89,8 @@ export default function EditMemo() {
     } catch (error) {
       console.error(error);
       alert('エラーが発生しました。');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -140,8 +154,9 @@ export default function EditMemo() {
         </h1>
         <button 
           onClick={handleSave}
+          disabled={isSaving}
           style={{ 
-            background: '#fff', 
+            background: isSaving ? '#666' : '#fff', 
             color: '#000', 
             border: 'none', 
             borderRadius: '999px',
@@ -149,11 +164,12 @@ export default function EditMemo() {
             fontWeight: 700,
             display: 'flex',
             alignItems: 'center',
-            gap: '6px'
+            gap: '6px',
+            cursor: isSaving ? 'not-allowed' : 'pointer'
           }}
         >
           <Check size={18} />
-          {isEditing ? '更新' : '保存'}
+          {isSaving ? '保存中...' : (isEditing ? '更新' : '保存')}
         </button>
       </header>
 
@@ -207,6 +223,12 @@ export default function EditMemo() {
           }}
         />
       </main>
+
+      <Toast 
+        message={toast.message} 
+        isVisible={toast.isVisible} 
+        onClose={() => setToast({ ...toast, isVisible: false })} 
+      />
     </motion.div>
   );
 }
