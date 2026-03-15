@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { X, Calendar, Check } from 'lucide-react';
+import { X, Calendar, Check, Undo, Redo } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Toast from '../components/Toast';
 
@@ -179,7 +179,7 @@ export default function EditMemo() {
             }}
             title="元に戻す"
           >
-            ↩
+            <Undo size={18} />
           </button>
           <button
             onMouseDown={(e) => { 
@@ -208,7 +208,7 @@ export default function EditMemo() {
             }}
             title="やり直し"
           >
-            ↪
+            <Redo size={18} />
           </button>
           <button 
             onClick={handleSave}
