@@ -152,25 +152,84 @@ export default function EditMemo() {
         <h1 style={{ fontSize: '1.1rem', margin: 0 }}>
           {isEditing ? 'メモを編集' : '新規メモ'}
         </h1>
-        <button 
-          onClick={handleSave}
-          disabled={isSaving}
-          style={{ 
-            background: isSaving ? '#666' : '#fff', 
-            color: '#000', 
-            border: 'none', 
-            borderRadius: '999px',
-            padding: '6px 16px',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            cursor: isSaving ? 'not-allowed' : 'pointer'
-          }}
-        >
-          <Check size={18} />
-          {isSaving ? '保存中...' : (isEditing ? '更新' : '保存')}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onMouseDown={(e) => { 
+              e.preventDefault(); 
+              document.execCommand('undo'); 
+              setTimeout(() => {
+                const el = document.activeElement as HTMLTextAreaElement | HTMLInputElement;
+                if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT')) {
+                  if (el.tagName === 'TEXTAREA') setContent(el.value);
+                  if (el.tagName === 'INPUT') setTitle(el.value);
+                }
+              }, 10);
+            }}
+            style={{ 
+              background: '#222', 
+              border: '1px solid #444', 
+              color: '#fff', 
+              fontSize: '1.2rem', 
+              cursor: 'pointer',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            title="元に戻す"
+          >
+            ↩
+          </button>
+          <button
+            onMouseDown={(e) => { 
+              e.preventDefault(); 
+              document.execCommand('redo'); 
+              setTimeout(() => {
+                const el = document.activeElement as HTMLTextAreaElement | HTMLInputElement;
+                if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT')) {
+                  if (el.tagName === 'TEXTAREA') setContent(el.value);
+                  if (el.tagName === 'INPUT') setTitle(el.value);
+                }
+              }, 10);
+            }}
+            style={{ 
+              background: '#222', 
+              border: '1px solid #444', 
+              color: '#fff', 
+              fontSize: '1.2rem', 
+              cursor: 'pointer',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: '8px'
+            }}
+            title="やり直し"
+          >
+            ↪
+          </button>
+          <button 
+            onClick={handleSave}
+            disabled={isSaving}
+            style={{ 
+              background: isSaving ? '#666' : '#fff', 
+              color: '#000', 
+              border: 'none', 
+              borderRadius: '999px',
+              padding: '6px 16px',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: isSaving ? 'not-allowed' : 'pointer'
+            }}
+          >
+            <Check size={18} />
+            {isSaving ? '保存中...' : (isEditing ? '更新' : '保存')}
+          </button>
+        </div>
       </header>
 
       <main style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
