@@ -145,7 +145,7 @@ export default function EditMemo() {
   
   const renderHighlightedContent = () => {
     if (!searchText) {
-      return content;
+      return null;
     }
 
     const escapeRegExp = (string: string) => {
@@ -374,17 +374,18 @@ export default function EditMemo() {
               position: 'absolute',
               top: 0, left: 0, right: 0, bottom: 0,
               padding: 0,
+              margin: 0,
               fontSize: '1.1rem',
               lineHeight: 1.6,
               fontFamily: 'inherit',
               whiteSpace: 'pre-wrap',
               wordWrap: 'break-word',
+              wordBreak: 'break-word',
               color: '#aaa',
               overflow: 'hidden',
               zIndex: 1,
               pointerEvents: 'none',
-              // Add a transparent border to perfectly match texarea's padding/box-sizing if any
-              border: '1px solid transparent'
+              border: 'none'
             }}
           >
             {renderHighlightedContent()}
@@ -417,7 +418,10 @@ export default function EditMemo() {
               color: searchText ? 'transparent' : '#aaa',
               caretColor: '#fff',
               lineHeight: 1.6,
-              fontFamily: 'inherit'
+              fontFamily: 'inherit',
+              whiteSpace: 'pre-wrap',
+              wordWrap: 'break-word',
+              wordBreak: 'break-word'
             }}
           />
         </div>
