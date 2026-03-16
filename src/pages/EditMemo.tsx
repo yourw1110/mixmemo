@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { X, Calendar, Check, Undo, Redo } from 'lucide-react';
+import { X, Calendar, Check, Undo, Redo, Search, Replace } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Toast from '../components/Toast';
 
@@ -24,6 +24,21 @@ export default function EditMemo() {
   const [isLoading, setIsLoading] = useState(isEditing);
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState({ isVisible: false, message: '' });
+
+  // Search and Replace state
+  const [searchText, setSearchText] = useState('');
+  const [replaceText, setReplaceText] = useState('');
+  
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+
+  // Sync scroll
+  const handleScroll = () => {
+    if (textareaRef.current && backdropRef.current) {
+      backdropRef.current.scrollTop = textareaRef.current.scrollTop;
+      backdropRef.current.scrollLeft = textareaRef.current.scrollLeft;
+    }
+  };
 
   useEffect(() => {
     if (isEditing) {
@@ -94,6 +109,22 @@ export default function EditMemo() {
     }
   };
 
+  const handleReplaceAll = () => {
+    if (!searchText) return;
+    
+    // Create a regex to match all occurrences (global, case-insensitive if desired, but here we do plain string replacement globally)
+    // Escaping regex special characters in searchText to ensure exact string match
+    const escapeRegExp = (string: string) => {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
+    }
+    
+    const regex = new RegExp(escapeRegExp(searchText), 'g');
+    const newContent = content.replace(regex, replaceText);
+    
+    setContent(newContent);
+    setToast({ isVisible: true, message: 'すべて置換しました' });
+  };
+
   if (isLoading) {
     return (
       <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
@@ -110,6 +141,29 @@ export default function EditMemo() {
       hour: '2-digit',
       minute: '2-digit',
     }).format(new Date(timestamp));
+  };
+  
+  const renderHighlightedContent = () => {
+    if (!searchText) {
+      return content;
+    }
+
+    const escapeRegExp = (string: string) => {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
+    }
+    
+    const regex = new RegExp(`(${escapeRegExp(searchText)})`, 'gi');
+    const parts = content.split(regex);
+
+    return parts.map((part, i) => 
+      regex.test(part) ? (
+        <mark key={i} style={{ backgroundColor: '#fff', color: '#000', borderRadius: '2px', padding: '0 2px' }}>
+          {part}
+        </mark>
+      ) : (
+        part
+      )
+    );
   };
 
   return (
@@ -263,24 +317,110 @@ export default function EditMemo() {
           }}
           autoFocus={!isEditing}
         />
+
+        {/* Search & Replace Tools */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '8px', 
+          background: '#111', 
+          padding: '12px', 
+          borderRadius: '8px',
+          alignItems: 'center',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: '200px', background: '#222', borderRadius: '6px', padding: '0 8px' }}>
+            <Search size={16} color="#888" />
+            <input 
+              type="text" 
+              placeholder="検索" 
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              style={{ background: 'none', border: 'none', padding: '8px', flex: 1, marginBottom: 0, outline: 'none', color: '#fff' }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: '200px', background: '#222', borderRadius: '6px', padding: '0 8px' }}>
+            <Replace size={16} color="#888" />
+            <input 
+              type="text" 
+              placeholder="置換" 
+              value={replaceText}
+              onChange={(e) => setReplaceText(e.target.value)}
+              style={{ background: 'none', border: 'none', padding: '8px', flex: 1, marginBottom: 0, outline: 'none', color: '#fff' }}
+            />
+          </div>
+          <button 
+            onClick={handleReplaceAll}
+            disabled={!searchText}
+            style={{ 
+              background: searchText ? '#fff' : '#333', 
+              color: searchText ? '#000' : '#888', 
+              fontWeight: 600, 
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              cursor: searchText ? 'pointer' : 'not-allowed',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            すべて置換
+          </button>
+        </div>
         
-        <textarea 
-          placeholder="内容を入力" 
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          style={{ 
-            background: 'none', 
-            border: 'none', 
-            fontSize: '1.1rem', 
-            width: '100%',
-            flex: 1,
-            padding: 0,
-            outline: 'none',
-            resize: 'none',
-            color: '#aaa',
-            lineHeight: 1.6
-          }}
-        />
+        <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          {/* Backdrop for highlights */}
+          <div 
+            ref={backdropRef}
+            style={{
+              position: 'absolute',
+              top: 0, left: 0, right: 0, bottom: 0,
+              padding: 0,
+              fontSize: '1.1rem',
+              lineHeight: 1.6,
+              fontFamily: 'inherit',
+              whiteSpace: 'pre-wrap',
+              wordWrap: 'break-word',
+              color: '#aaa',
+              overflow: 'hidden',
+              zIndex: 1,
+              pointerEvents: 'none',
+              // Add a transparent border to perfectly match texarea's padding/box-sizing if any
+              border: '1px solid transparent'
+            }}
+          >
+            {renderHighlightedContent()}
+            {/* Adding extra space to match textarea scrolling behavior at the end */}
+            <br/><br/><br/>
+          </div>
+
+          <textarea 
+            ref={textareaRef}
+            placeholder="内容を入力" 
+            value={content}
+            onChange={(e) => {
+              setContent(e.target.value);
+              handleScroll();
+            }}
+            onScroll={handleScroll}
+            style={{ 
+              position: 'relative',
+              zIndex: 2,
+              background: 'transparent', 
+              border: 'none', 
+              fontSize: '1.1rem', 
+              width: '100%',
+              flex: 1,
+              padding: 0,
+              margin: 0,
+              outline: 'none',
+              resize: 'none',
+              // Use transparent text color when searching to see highlights, otherwise use normal color
+              color: searchText ? 'transparent' : '#aaa',
+              caretColor: '#fff',
+              lineHeight: 1.6,
+              fontFamily: 'inherit'
+            }}
+          />
+        </div>
       </main>
 
       <Toast 
