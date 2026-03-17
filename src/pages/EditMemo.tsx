@@ -28,6 +28,7 @@ export default function EditMemo() {
   // Search and Replace state
   const [searchText, setSearchText] = useState('');
   const [replaceText, setReplaceText] = useState('');
+  const [showSearchReplace, setShowSearchReplace] = useState(false);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -208,6 +209,24 @@ export default function EditMemo() {
         </h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
+            onClick={() => setShowSearchReplace(!showSearchReplace)}
+            style={{ 
+              background: showSearchReplace ? '#444' : '#222', 
+              border: '1px solid #444', 
+              color: '#fff', 
+              fontSize: '1.2rem', 
+              cursor: 'pointer',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            title="検索と置換"
+          >
+            <Search size={18} />
+          </button>
+          <button
             onMouseDown={(e) => { 
               e.preventDefault(); 
               document.execCommand('undo'); 
@@ -319,52 +338,54 @@ export default function EditMemo() {
         />
 
         {/* Search & Replace Tools */}
-        <div style={{ 
-          display: 'flex', 
-          gap: '8px', 
-          background: '#111', 
-          padding: '12px', 
-          borderRadius: '8px',
-          alignItems: 'center',
-          flexWrap: 'wrap'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: '200px', background: '#222', borderRadius: '6px', padding: '0 8px' }}>
-            <Search size={16} color="#888" />
-            <input 
-              type="text" 
-              placeholder="検索" 
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              style={{ background: 'none', border: 'none', padding: '8px', flex: 1, marginBottom: 0, outline: 'none', color: '#fff' }}
-            />
+        {showSearchReplace && (
+          <div style={{ 
+            display: 'flex', 
+            gap: '8px', 
+            background: '#111', 
+            padding: '12px', 
+            borderRadius: '8px',
+            alignItems: 'center',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: '200px', background: '#222', borderRadius: '6px', padding: '0 8px' }}>
+              <Search size={16} color="#888" />
+              <input 
+                type="text" 
+                placeholder="検索" 
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                style={{ background: 'none', border: 'none', padding: '8px', flex: 1, marginBottom: 0, outline: 'none', color: '#fff' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: '200px', background: '#222', borderRadius: '6px', padding: '0 8px' }}>
+              <Replace size={16} color="#888" />
+              <input 
+                type="text" 
+                placeholder="置換" 
+                value={replaceText}
+                onChange={(e) => setReplaceText(e.target.value)}
+                style={{ background: 'none', border: 'none', padding: '8px', flex: 1, marginBottom: 0, outline: 'none', color: '#fff' }}
+              />
+            </div>
+            <button 
+              onClick={handleReplaceAll}
+              disabled={!searchText}
+              style={{ 
+                background: searchText ? '#fff' : '#333', 
+                color: searchText ? '#000' : '#888', 
+                fontWeight: 600, 
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                cursor: searchText ? 'pointer' : 'not-allowed',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              すべて置換
+            </button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: '200px', background: '#222', borderRadius: '6px', padding: '0 8px' }}>
-            <Replace size={16} color="#888" />
-            <input 
-              type="text" 
-              placeholder="置換" 
-              value={replaceText}
-              onChange={(e) => setReplaceText(e.target.value)}
-              style={{ background: 'none', border: 'none', padding: '8px', flex: 1, marginBottom: 0, outline: 'none', color: '#fff' }}
-            />
-          </div>
-          <button 
-            onClick={handleReplaceAll}
-            disabled={!searchText}
-            style={{ 
-              background: searchText ? '#fff' : '#333', 
-              color: searchText ? '#000' : '#888', 
-              fontWeight: 600, 
-              border: 'none',
-              padding: '8px 16px',
-              borderRadius: '6px',
-              cursor: searchText ? 'pointer' : 'not-allowed',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            すべて置換
-          </button>
-        </div>
+        )}
         
         <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
           {/* Backdrop for highlights */}
