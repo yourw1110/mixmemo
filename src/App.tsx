@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { 
   Plus, 
   Merge, 
   Trash2, 
   GripVertical, 
-  Calendar
+  Calendar,
+  MoreVertical,
+  Upload,
+  Download
 } from 'lucide-react';
 import { 
   DndContext, 
@@ -129,9 +132,82 @@ function MemoList({
   setMemos, 
   selectedIds, 
   setSelectedIds, 
-  setIsMergeModalOpen 
+  setIsMergeModalOpen,
+  fetchMemos
 }: any) {
   const navigate = useNavigate();
+  
+  // Menu state
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isMenuOpen && !(event.target as Element).closest('.app-menu-container')) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMenuOpen]);
+
+  const handleImportClick = () => {
+    setIsMenuOpen(false);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const title = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+      const text = await file.text();
+      
+      const newMemoData = {
+        id: crypto.randomUUID(),
+        title: title || '無題のメモ',
+        content: text,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+
+      try {
+        await fetch('/api/memos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newMemoData),
+        });
+      } catch (error) {
+        console.error(`Failed to import ${file.name}:`, error);
+      }
+    }
+    
+    // Clear input so the same file can be selected again if needed
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    
+    await fetchMemos();
+  };
+
+  const handleExportAll = () => {
+    setIsMenuOpen(false);
+    if (memos.length === 0) return;
+    
+    const content = memos.map((m: Memo) => `> ${m.title}\n${m.content}`).join('\n\n');
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `memos_all_${new Date().toISOString().slice(0,10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
   
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -200,6 +276,16 @@ function MemoList({
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Hidden file input for importing text files */}
+      <input 
+        type="file" 
+        accept=".txt" 
+        multiple 
+        ref={fileInputRef} 
+        onChange={handleFileChange} 
+        style={{ display: 'none' }} 
+      />
+      
       <header style={{ 
         padding: '24px 40px', 
         borderBottom: '1px solid var(--border-color)',
@@ -213,13 +299,94 @@ function MemoList({
         zIndex: 100
       }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.02em' }}>MEMO</h1>
-        <button 
-          onClick={() => navigate('/edit/new')}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}
-        >
-          <Plus size={18} />
-          新しいメモ
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button 
+            onClick={() => navigate('/edit/new')}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}
+          >
+            <Plus size={18} />
+            新しいメモ
+          </button>
+          
+          <div className="app-menu-container" style={{ position: 'relative' }}>
+            <button 
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#fff',
+                padding: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '50%',
+              }}
+            >
+              <MoreVertical size={20} />
+            </button>
+            
+            <AnimatePresence>
+              {isMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '8px',
+                    background: '#1a1a1a',
+                    border: '1px solid #333',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                    padding: '8px 0',
+                    minWidth: '220px',
+                    zIndex: 200,
+                  }}
+                >
+                  <button 
+                    onClick={handleImportClick}
+                    style={{
+                      width: '100%',
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#ddd',
+                      padding: '10px 16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      fontSize: '0.9rem',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <Upload size={16} color="#aaa" />
+                    テキストをインポート
+                  </button>
+                  <button 
+                    onClick={handleExportAll}
+                    style={{
+                      width: '100%',
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#ddd',
+                      padding: '10px 16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      fontSize: '0.9rem',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <Download size={16} color="#aaa" />
+                    すべてエクスポート
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
       </header>
 
       <main style={{ flex: 1, position: 'relative' }}>
@@ -284,6 +451,38 @@ function MemoList({
           >
             <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedIds.length} 個選択中</span>
             <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                onClick={() => {
+                  const selectedMemos = memos.filter((m: Memo) => selectedIds.includes(m.id));
+                  if (selectedMemos.length === 0) return;
+                  
+                  const content = selectedMemos.map((m: Memo) => `> ${m.title}\n${m.content}`).join('\n\n');
+                  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `memos_selected_${new Date().toISOString().slice(0,10)}.txt`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                  setSelectedIds([]);
+                }}
+                style={{ 
+                  background: 'none', 
+                  color: '#444', 
+                  border: '1px solid #ccc',
+                  borderRadius: '999px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  fontSize: '0.8rem'
+                }}
+              >
+                <Download size={12} />
+                出力
+              </button>
               {selectedIds.length >= 2 && (
                 <button 
                   onClick={() => setIsMergeModalOpen(true)}
@@ -409,6 +608,7 @@ export default function App() {
               selectedIds={selectedIds} 
               setSelectedIds={setSelectedIds} 
               setIsMergeModalOpen={setIsMergeModalOpen}
+              fetchMemos={fetchMemos}
             />
           } 
         />
