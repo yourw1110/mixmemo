@@ -136,6 +136,10 @@ function MemoList({
   fetchMemos
 }: any) {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchMemos();
+  }, []);
   
   // Menu state
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -559,9 +563,6 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    fetchMemos();
-  }, []);
 
   const handleMerge = async () => {
     if (!mergeTitle.trim()) {
